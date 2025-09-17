@@ -1,19 +1,20 @@
 import sqlite3
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-import csv
 import math
 import os
 import traceback
 
 DEBUG = True
+DEBUG_LOGS = []
 
 def debug_print(*args):
     if DEBUG:
+        msg = " ".join(map(str, args))
+        DEBUG_LOGS.append(msg)
         print("[DEBUG]:", *args)
 
 def create_drawio_from_csv(tables, fks, output_file="conceptual_erd.drawio"):
-
     # Create draw.io XML
     debug_print("Initializing mxGraph XML structure")
     mxfile = ET.Element("mxfile", host="app.diagrams.net")
@@ -129,7 +130,7 @@ def create_drawio_from_csv(tables, fks, output_file="conceptual_erd.drawio"):
         for col_data in data["columns"]:
             name = col_data["name"]
             role = col_data["role"]
-            if role == "FK":
+            if role == "FK" or role == "PK+FK" :
                 debug_print("Skip drawing FK attribute", {"table": table_name, "column": name})
                 continue
 
@@ -158,8 +159,15 @@ def create_drawio_from_csv(tables, fks, output_file="conceptual_erd.drawio"):
 
         label = f"{rel['from_table']}→ {rel['to_table']}.{rel['to_column']}"
         debug_print("Relationship diamond placement", {"i": i, "label": label, "x": rx, "y": ry})
+        is_weak = (
+                tables[rel['from_table']]['type'] == 'weak'
+        )
 
-        diamond_id = add_shape(label, "rhombus;whiteSpace=wrap;html=1;", rx, ry, 100, 60)
+        style = ("shape=rhombus;double=1;perimeter=rhombusPerimeter;whiteSpace=wrap;html=1;align=center;"
+                 if is_weak
+                 else "shape=rhombus;whiteSpace=wrap;html=1;align=center;")
+
+        diamond_id = add_shape(label, style, rx, ry, 100, 60)
 
         from_id = shape_ids.get(rel["from_table"])
         to_id = shape_ids.get(rel["to_table"])
@@ -285,7 +293,7 @@ def analyze_sqlite_schema(sqlite_file):
         debug_print("SQLite connection closed")
 
 if __name__ == "__main__":
-    directory = "../Spider Dataset2/Daniel/apartment_rentals"
+    directory = "../Spider Dataset2/Tran/shop_membership"
     debug_print("Script start. Walking directory:", directory)
 
     for foldername, subfolders, filenames in os.walk(directory):
@@ -307,5 +315,10 @@ if __name__ == "__main__":
 
                 tables, fk_relations = analyze_sqlite_schema(file_path)
                 create_drawio_from_csv(tables, fk_relations, drawio_path)
+                with open(os.path.join(foldername, "debug_log.txt"), "w", encoding="utf-8", newline="") as debug_log:
+                    debug_log.write("\n".join(DEBUG_LOGS))
+                DEBUG_LOGS.clear()
+
+
 
     debug_print("Script completed")
