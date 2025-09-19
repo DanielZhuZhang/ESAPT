@@ -1,0 +1,16 @@
+CREATE TABLE Player (
+    PID VARCHAR(255),
+    PName VARCHAR(255),
+    PRIMARY KEY (PID)
+);
+
+-- Exact 1–1: enforced with UNIQUE + NOT NULL
+
+CREATE TABLE StorageArea (
+    PID VARCHAR(255) UNIQUE NOT NULL,
+    RID VARCHAR(255),
+    size VARCHAR(255),
+    Location VARCHAR(255),
+    PRIMARY KEY (RID),
+    FOREIGN KEY (PID) REFERENCES Player(PID)
+);

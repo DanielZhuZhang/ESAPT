@@ -72,7 +72,7 @@ def parse_sql(sql_code):
             continue
 
         table_name = match.group("name")
-        print(f">>> Processing table: {table_name}")
+        print(f"Processing table: {table_name}")
         column_block = match.group("cols").replace('\n', '').replace('\r', '')
         raw_columns = smart_split_columns(column_block)
         print(f"  Found {len(raw_columns)} column definitions.")
