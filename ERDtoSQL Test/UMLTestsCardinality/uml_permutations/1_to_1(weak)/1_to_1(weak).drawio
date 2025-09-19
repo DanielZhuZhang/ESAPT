@@ -1,16 +1,16 @@
-<mxfile host="drawio-plugin" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" modified="2025-09-19T02:06:47.744Z" etag="a8eXQ2669Gvt1gXXS_aJ" version="22.1.22" type="embed">
+<mxfile host="drawio-plugin" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36" modified="2025-09-19T20:01:23.094Z" etag="SLGqyQOh64e0Uw1u5kB1" version="22.1.22" type="embed">
   <diagram id="CV-7iMhTwDsSw8HW35_V" name="Page-2">
-    <mxGraphModel dx="1439" dy="1671" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+    <mxGraphModel dx="959" dy="1581" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="OYU8KybXDZn0yK4VQ5Yo-1" value="Player" style="shape=ext;whiteSpace=wrap;double=1;html=1;align=center;" parent="1" vertex="1">
+        <mxCell id="OYU8KybXDZn0yK4VQ5Yo-1" value="Player" style="shape=ext;whiteSpace=wrap;html=1;align=center;" parent="1" vertex="1">
           <mxGeometry x="230" y="69.99875" width="100" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="OYU8KybXDZn0yK4VQ5Yo-3" value="owns" style="shape=rhombus;perimeter=rhombusPerimeter;double=1;whiteSpace=wrap;html=1;align=center;" parent="1" vertex="1">
+        <mxCell id="OYU8KybXDZn0yK4VQ5Yo-3" value="owns" style="shape=rhombus;perimeter=rhombusPerimeter;whiteSpace=wrap;html=1;align=center;double=1;" parent="1" vertex="1">
           <mxGeometry x="440" y="39.99875" width="120" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="H6HtzpZKu-8QVZK8X9g0-1" value="StorageArea" style="whiteSpace=wrap;html=1;align=center;" parent="1" vertex="1">
+        <mxCell id="H6HtzpZKu-8QVZK8X9g0-1" value="StorageArea" style="shape=ext;double=1;whiteSpace=wrap;html=1;align=center;" parent="1" vertex="1">
           <mxGeometry x="650" y="49.99875" width="100" height="40" as="geometry" />
         </mxCell>
         <mxCell id="yz787PNUihDiX31Gsf9V-1" value="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=none;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;noEdgeStyle=1;orthogonal=1;" parent="1" source="OYU8KybXDZn0yK4VQ5Yo-3" target="OYU8KybXDZn0yK4VQ5Yo-1" edge="1">
