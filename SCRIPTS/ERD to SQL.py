@@ -290,16 +290,42 @@ def generate_sql():
 
 
                 elif cardinality1 in ["Exactly 1", "Optional: 0 or 1"] and cardinality2 in ["0 or More", "1 or More"]:
-                    entities[entity2_id]["Attributes"].extend(make_attribute_tuples(entity1_primary_keys))
-                    entities[entity2_id]["ForeignKeys"].append(entity1_id)
-                    entities[entity2_id]["PrimaryKeys"].extend(entity1_primary_keys + relation_primary_keys)
-                    entities[entity2_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
+                    if (entity_2_is_weak):
+                        entities[entity2_id]["Attributes"].extend(
+                            make_attribute_tuples(entity1_primary_keys)
+                        )
+                        entities[entity2_id]["ForeignKeys"].append(entity1_id)
+                        entities[entity2_id]["PrimaryKeys"].extend(entity1_primary_keys)
+                        entities[entity2_id]["Comments"].append("Why is the many-side weak????")
+                    else:
+                        entities[entity1_id]["Attributes"].extend(
+                            make_attribute_tuples(entity2_primary_keys)
+                        )
+                        entities[entity1_id]["ForeignKeys"].append(entity2_id)
+                        entities[entity1_id]["PrimaryKeys"].extend(entity2_primary_keys)
+                        entities[entity2_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
+
 
                 elif cardinality2 in ["Exactly 1", "Optional: 0 or 1"] and cardinality1 in ["0 or More", "1 or More"]:
-                    entities[entity1_id]["Attributes"].extend(make_attribute_tuples(entity2_primary_keys))
-                    entities[entity1_id]["ForeignKeys"].append(entity2_id)
-                    entities[entity1_id]["PrimaryKeys"].extend(entity2_primary_keys + relation_primary_keys)
-                    entities[entity1_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
+                    (entity1_primary_keys, entity1_all_attr,
+                     entity2_primary_keys, entity2_all_attr) = (
+                        entity2_primary_keys, entity2_all_attr,
+                        entity1_primary_keys, entity1_all_attr
+                    )
+                    if (entity_2_is_weak):
+                        entities[entity2_id]["Attributes"].extend(
+                            make_attribute_tuples(entity1_primary_keys)
+                        )
+                        entities[entity2_id]["ForeignKeys"].append(entity1_id)
+                        entities[entity2_id]["PrimaryKeys"].extend(entity1_primary_keys)
+                        entities[entity2_id]["Comments"].append("Why is the many-side weak????")
+                    else:
+                        entities[entity1_id]["Attributes"].extend(
+                            make_attribute_tuples(entity2_primary_keys)
+                        )
+                        entities[entity1_id]["ForeignKeys"].append(entity2_id)
+                        entities[entity1_id]["PrimaryKeys"].extend(entity2_primary_keys)
+                        entities[entity2_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
 
                 elif cardinality1 in ["0 or More", "1 or More"] and cardinality2 in ["0 or More", "1 or More"]:
                     entities[relation] = {
@@ -437,7 +463,7 @@ def generate_sql():
 
 
 if __name__ == '__main__':
-    input_file = "../ERDtoSQL Test/UMLTestsCardinality/uml_permutations/0_1_to_1_Many/0_1_to_1_Many.drawio"
+    input_file = "../ERDtoSQL Test/UMLTestsCardinality/uml_permutations/0_1(weak)_to_Many/0_1(weak)_to_Many.drawio"
     if os.path.exists(input_file):
         tree = ET.parse(input_file)
         root = tree.getroot()
