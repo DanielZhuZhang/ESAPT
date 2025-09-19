@@ -296,7 +296,7 @@ def generate_sql():
                         )
                         entities[entity2_id]["ForeignKeys"].append(entity1_id)
                         entities[entity2_id]["PrimaryKeys"].extend(entity1_primary_keys)
-                        entities[entity2_id]["Comments"].append("Why is the many-side weak????")
+                        entities[entity2_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
                     else:
                         entities[entity1_id]["Attributes"].extend(
                             make_attribute_tuples(entity2_primary_keys)
@@ -372,7 +372,7 @@ def generate_sql():
                                 f"Table for one-to-many between {SHAPE_MAP[entity1_id]['Name']} and {SHAPE_MAP[entity2_id]['Name']} due to relations having primary key."]
                         }
                     else:
-                        if(cardinality2 == "1 or More"):
+                        if(cardinality1 == "Exactly 1"):
                             entities[entity2_id]["Attributes"].extend(make_attribute_tuples(entity2_primary_keys,["NOT NULL"]))
                             entities[entity2_id]["ForeignKeys"].append(entity1_id)
                             entities[entity2_id]["Comments"].append(
@@ -399,7 +399,7 @@ def generate_sql():
                     else:
                         if (cardinality2 == "0 or More"):
                             entities[entity2_id]["Attributes"].extend(
-                                make_attribute_tuples(entity2_primary_keys, ["NOT NULL"]))
+                                make_attribute_tuples(entity2_primary_keys))
                             entities[entity2_id]["ForeignKeys"].append(entity1_id)
                             entities[entity2_id]["Comments"].append(
                                 f"Added FK to {SHAPE_MAP[entity1_id]['Name']} because {SHAPE_MAP[entity2_id]['Name']} is the many side."
