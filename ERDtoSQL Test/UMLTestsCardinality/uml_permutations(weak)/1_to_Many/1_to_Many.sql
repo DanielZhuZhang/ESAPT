@@ -4,13 +4,13 @@ CREATE TABLE Player (
     PRIMARY KEY (PID)
 );
 
--- Added FK to Player because StorageArea is the many side.
+-- Weak 1–Many: PK = owner PK + partial key
 
 CREATE TABLE StorageArea (
-    RID VARCHAR(255) NOT NULL,
+    PID VARCHAR(255),
     RID VARCHAR(255),
     size VARCHAR(255),
     Location VARCHAR(255),
-    PRIMARY KEY (RID),
+    PRIMARY KEY (RID, PID),
     FOREIGN KEY (PID) REFERENCES Player(PID)
 );

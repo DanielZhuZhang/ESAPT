@@ -4,13 +4,13 @@ CREATE TABLE Player (
     PRIMARY KEY (PID)
 );
 
--- Exact 1–1: enforced with UNIQUE + NOT NULL
+-- Weak 1–1: dependent PK = owner PK
 
 CREATE TABLE StorageArea (
-    PID VARCHAR(255) UNIQUE NOT NULL,
+    PID VARCHAR(255),
     RID VARCHAR(255),
     size VARCHAR(255),
     Location VARCHAR(255),
-    PRIMARY KEY (RID),
+    PRIMARY KEY (RID, PID),
     FOREIGN KEY (PID) REFERENCES Player(PID)
 );

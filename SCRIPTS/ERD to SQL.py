@@ -373,14 +373,14 @@ def generate_sql():
                         }
                     else:
                         if(cardinality1 == "Exactly 1"):
-                            entities[entity2_id]["Attributes"].extend(make_attribute_tuples(entity2_primary_keys,["NOT NULL"]))
+                            entities[entity2_id]["Attributes"].extend(make_attribute_tuples(entity1_primary_keys,["NOT NULL"]))
                             entities[entity2_id]["ForeignKeys"].append(entity1_id)
                             entities[entity2_id]["Comments"].append(
                                 f"Added FK to {SHAPE_MAP[entity1_id]['Name']} because {SHAPE_MAP[entity2_id]['Name']} is the many side."
                             )
                         else:
                             entities[entity2_id]["Attributes"].extend(
-                                make_attribute_tuples(entity2_primary_keys))
+                                make_attribute_tuples(entity1_primary_keys))
                             entities[entity2_id]["ForeignKeys"].append(entity1_id)
                             entities[entity2_id]["Comments"].append(
                                 f"Added FK to {SHAPE_MAP[entity1_id]['Name']} because {SHAPE_MAP[entity2_id]['Name']} is the many side."
@@ -473,7 +473,7 @@ if __name__ == '__main__':
     else:
         print(f"File {input_file} not found")
 
-    directory = "../ERDtoSQL Test/UMLTestsCardinality/uml_permutations"
+    directory = "../ERDtoSQL Test/UMLTestsCardinality"
 
     for root, dirs, files in os.walk(directory):
         for file in files:
