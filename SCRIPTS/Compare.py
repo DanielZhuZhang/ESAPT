@@ -93,7 +93,6 @@ def strip_datatypes(ast):
         expr_copy = expr.copy()
         for column in expr_copy.find_all(ColumnDef):
             column.set("kind", None)
-            column.set("constraints", None)
         cleaned.append(expr_copy)
     return cleaned
 
@@ -108,6 +107,36 @@ def get_create_node_for_table(ast, table_name):
             return stmt
     return None
 
+def constraint_checker(expr1, expr2):
+    def extract_constraints(expr):
+        constraints = {}
+        for col in expr.this.expressions:
+            if hasattr(col, "args") and col.args.get("constraints"):
+                col_constraints = []
+                for cons in col.args["constraints"]:
+                    # normalize constraint type
+                    if cons.this:
+                        col_constraints.append(cons.this.upper())
+                    if cons.kind:
+                        col_constraints.append(cons.kind.__class__.__name__.upper())
+                constraints[col.name] = set(col_constraints)
+        return constraints
+
+    cons1 = extract_constraints(expr1)
+    cons2 = extract_constraints(expr2)
+
+    results = []
+    equivalent = True
+
+    # columns present in both schemas
+    for col in set(cons1.keys()) | set(cons2.keys()):
+        c1 = cons1.get(col, set())
+        c2 = cons2.get(col, set())
+        if c1 != c2:
+            results.append(f"Constraint mismatch on column '{col}':\n  schema1: {c1}\n  schema2: {c2}")
+            equivalent = False
+
+    return results, equivalent
 
 def compare_schemas(schema1_str, schema2_str):
     equivalent = True
@@ -136,6 +165,7 @@ def compare_schemas(schema1_str, schema2_str):
         results.append("No common tables to compare.")
         return results, False
 
+
     for table in common_tables:
         results.append(f"\nComparing table: {table}")
 
@@ -150,7 +180,10 @@ def compare_schemas(schema1_str, schema2_str):
         results.extend(attr_diff)
         if not attrs_eq:
             equivalent = False
-
+        cons_diff, cons_eq = constraint_checker(table_orig_1, table_orig_2)
+        results.extend(cons_diff)
+        if not cons_eq:
+            equivalent = False
         # primary keys
         pk_diff, pk_eq = primary_key_checker(table_orig_1, table_orig_2)
         results.extend(pk_diff)
@@ -191,8 +224,6 @@ if __name__ == "__main__":
 
     file_path = "../ERDtoSQL Test/UMLTestsCardinality"
 
-    file_path = "../ERDtoSQL Test/UMLTestsCardinality"
-
     equivalent_groups = []  # list of groups
 
     for dirpath, dirnames, filenames in os.walk(file_path):
@@ -230,7 +261,5 @@ if __name__ == "__main__":
     for idx, group in enumerate(equivalent_groups, 1):
         print(f"\nGroup {idx}:")
         for f in group["files"]:
-            print("+++++++++++++++++")
             print("  -", f["filename"])
-            """print("  -", f["sql"])"""
-            print("+++++++++++++++++")
+

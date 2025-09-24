@@ -463,7 +463,7 @@ def generate_sql():
 
 
 if __name__ == '__main__':
-    input_file = "../ERDtoSQL Test/UMLTestsCardinality/uml_permutations/0_1(weak)_to_Many/0_1(weak)_to_Many.drawio"
+    """input_file = "../ERDtoSQL Test/UMLTestsCardinality/uml_permutations/0_1(weak)_to_Many/0_1(weak)_to_Many.drawio"
     if os.path.exists(input_file):
         tree = ET.parse(input_file)
         root = tree.getroot()
@@ -471,7 +471,7 @@ if __name__ == '__main__':
         update_shape_map(root)
         print(generate_sql())
     else:
-        print(f"File {input_file} not found")
+        print(f"File {input_file} not found")"""
 
     directory = "../ERDtoSQL Test/UMLTestsCardinality"
 
@@ -481,17 +481,14 @@ if __name__ == '__main__':
                 file_path = os.path.join(root, file)
                 SHAPE_MAP.clear()
                 RELATIONSHIPS.clear()
-                # parse the .drawio file
                 tree = ET.parse(file_path)
                 xml_root = tree.getroot()
 
                 update_shape_map(xml_root)
 
-                # build the output filename (same name, but .sql)
-                base_name = os.path.splitext(file)[0]  # removes .drawio
+                base_name = os.path.splitext(file)[0]
                 output_path = os.path.join(root, base_name + ".sql")
 
-                # write the SQL to a separate file
                 with open(output_path, "w") as sql_file:
                     print(f"+++++++++++++++++++++++++++++++++++++writing to {output_path}+++++++++++++++++++++++++++++++++++++++++++++++++++")
                     sql_file.write(generate_sql())
