@@ -70,32 +70,11 @@ schema_dict = {
 }
 
 """
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
+
 def create_drawio(schema_dict, output_file="conceptual_erd.drawio"):
-    result = {}
-    for table_name, data in schema_dict.items():
-        # Gather all FK columns in this table
-        fk_cols = {fk["from_column"] for fk in data["foreign_keys"]}
-
-        # Gather PK columns, but only those NOT in FK set
-        pure_pks = [
-            col["name"] for col in data["columns"]
-            if col["pk"] > 0 and col["name"] not in fk_cols
-        ]
-
-        result[table_name] = pure_pks
-    all_fks = []
-
-    for table_name, data in schema_dict.items():
-        for fk in data["foreign_keys"]:
-            all_fks.append({
-                "from_table": table_name,
-                "from_column": fk["from_column"],
-                "to_table": fk["to_table"],
-                "to_column": fk["to_column"],
-                "cardinality": fk.get("cardinality", "None"),
-            })
-
-    # Create draw.io XML
+    # --- Setup XML base ---
     mxfile = ET.Element("mxfile", host="app.diagrams.net")
     diagram = ET.SubElement(mxfile, "diagram", name="ERD")
     graph = ET.Element("mxGraphModel")
@@ -131,7 +110,7 @@ def create_drawio(schema_dict, output_file="conceptual_erd.drawio"):
         root.append(cell)
         return sid
 
-    def add_edge(source_id, target_id, value = ""):
+    def add_edge(source_id, target_id, value=""):
         eid = new_id()
         cell = ET.Element("mxCell", {
             "id": eid,
@@ -142,17 +121,14 @@ def create_drawio(schema_dict, output_file="conceptual_erd.drawio"):
             "source": source_id,
             "target": target_id
         })
-        geometry = ET.Element("mxGeometry", {
-            "relative": "1",
-            "as": "geometry"
-        })
+        geometry = ET.Element("mxGeometry", {"relative": "1", "as": "geometry"})
         cell.append(geometry)
         root.append(cell)
         return eid
 
-    # Layout for entities
     num_tables = len(schema_dict)
     if num_tables == 0:
+        print("No tables found in schema_dict.")
         return
 
     max_per_row = 3
@@ -175,108 +151,105 @@ def create_drawio(schema_dict, output_file="conceptual_erd.drawio"):
             max_height_in_row = entity_height
         elif col > 0:
             x += x_spacing
-
         col += 1
 
+        # Pick style
         table_type = data["type"].lower()
-        if table_type == "entity":
-            style = "shape=rectangle;whiteSpace=wrap;html=1;"
-        elif "weak" in table_type:
-            style = "shape=ext;margin=3;double=1;whiteSpace=wrap;html=1;align=center;"
+        if "weak" in table_type:
+            style = "shape=ext;double=1;whiteSpace=wrap;html=1;"
         elif "associative" in table_type:
-            style = "shape=associativeEntity;whiteSpace=wrap;html=1;align=center;"
+            style = "shape=associativeEntity;whiteSpace=wrap;html=1;"
         else:
             style = "shape=rectangle;whiteSpace=wrap;html=1;"
 
         entity_id = add_shape(table_name, style, x, cur_y, 140, 40)
         shape_ids[table_name] = entity_id
 
-        # Attributes
+        # Add attributes
         fk_cols = {fk["from_column"] for fk in data["foreign_keys"]}
         pk_cols = [col["name"] for col in data["columns"] if col["pk"] > 0]
-        fk_in_pk_cols = [col for col in pk_cols if col in fk_cols]
 
         attr_y = cur_y + 60
         for col_data in data["columns"]:
             name = col_data["name"]
             role = "Attr"
-            if col_data["pk"] > 0 and name in fk_cols:
-                role = "PK+FK"
-            elif col_data["pk"] > 0:
+            if col_data["pk"] > 0:
                 role = "PK"
-            elif name in fk_cols:
-                role = "FK"
-            if ("FK" not in role):
+            if name in fk_cols:
+                role = "FK" if role == "Attr" else "PK+FK"
+
+            # Don’t draw FK-only attributes
+            if "FK" not in role:
                 label_attr = f"<u>{name}</u>" if role.startswith("PK") else name
-                style_attr = "ellipse;whiteSpace=wrap;html=1;"
-                attr_id = add_shape(label_attr, style_attr, x + 180, attr_y, 120, 30)
+                attr_id = add_shape(label_attr, "ellipse;whiteSpace=wrap;html=1;", x + 180, attr_y, 120, 30)
                 add_edge(entity_id, attr_id)
                 attr_y += attr_spacing
-        parent_tables = data["parent_tables"]
-    # Relationships
-    rel_cols = 4
+
+    # ---------------------------
+    # PASS 2: RELATIONSHIPS
+    # ---------------------------
+    rel_x_start = 150
+    rel_y_start = cur_y + max_height_in_row + 150
     rel_x_spacing = 250
     rel_y_spacing = 150
-    rel_start_y = cur_y + max_height_in_row + 150
+    rel_index = 0
 
-    # --- Normal Relationships ---
-    for i, rel in enumerate(all_fks):
-        if rel["to_table"] in parent_tables:
-            # Skip parent table FKs here, they'll be handled separately for weak entities
-            continue
+    for table_name, data in schema_dict.items():
+        parent_tables = data.get("parent_tables", [])
+        table_type = data["type"].lower()
 
-        col = i % rel_cols
-        row = i // rel_cols
-        rx = 150 + col * rel_x_spacing
-        ry = rel_start_y + row * rel_y_spacing
+        # Normal FKs
+        for fk in data["foreign_keys"]:
+            from_table = table_name
+            to_table = fk["to_table"]
 
-        # Relationship diamond
-        label = f"{rel['from_table']}.{rel['from_column']} → {rel['to_table']}.{rel['to_column']} ({rel['cardinality']})"
-        diamond_id = add_shape(label, "rhombus;whiteSpace=wrap;html=1;", rx, ry, 120, 60)
+            # Skip parent tables (handled as identifying relationships)
+            if to_table in parent_tables:
+                continue
 
-        from_id = shape_ids.get(rel["from_table"])
-        to_id = shape_ids.get(rel["to_table"])
+            rx = rel_x_start + (rel_index % 4) * rel_x_spacing
+            ry = rel_y_start + (rel_index // 4) * rel_y_spacing
+            rel_index += 1
 
-        if from_id and to_id:
-            left_card, right_card = rel["cardinality"].split(":")
-            add_edge(from_id, diamond_id, left_card)   # child side
-            add_edge(diamond_id, to_id, right_card)   # parent side
+            label = f"{from_table}.{fk['from_column']} → {to_table}.{fk['to_column']} ({fk.get('cardinality','N:1')})"
+            diamond_id = add_shape(label, "rhombus;whiteSpace=wrap;html=1;", rx, ry, 120, 60)
 
+            from_id = shape_ids.get(from_table)
+            to_id = shape_ids.get(to_table)
+            if from_id and to_id:
+                left_card, right_card = fk.get("cardinality", "N:1").split(":")
+                add_edge(from_id, diamond_id, left_card)
+                add_edge(diamond_id, to_id, right_card)
 
-    # --- Identifying Relationships (Weak Entities) ---
-    for i, parent_table in enumerate(parent_tables):
-        col = i % rel_cols
-        row = i // rel_cols
-        rx = 150 + col * rel_x_spacing
-        ry = rel_start_y + row * rel_y_spacing
+        # Identifying (weak) relationships
+        for parent_table in parent_tables:
+            rx = rel_x_start + (rel_index % 4) * rel_x_spacing
+            ry = rel_y_start + (rel_index // 4) * rel_y_spacing
+            rel_index += 1
 
-        if table_type == "weak entity":
-            style = "rhombus;double=1;whiteSpace=wrap;html=1;"  # double diamond for weak relationship
-            label = f"Identifying relation {table_name} → {parent_table}"
-        else:
             style = "rhombus;whiteSpace=wrap;html=1;"
             label = f"{table_name} → {parent_table}"
+            if "weak" in table_type:
+                style = "rhombus;double=1;whiteSpace=wrap;html=1;"
+                label = f"Identifying {table_name} → {parent_table}"
 
-        diamond_id = add_shape(label, style, rx, ry, 120, 60)
+            diamond_id = add_shape(label, style, rx, ry, 120, 60)
 
-        from_id = shape_ids.get(table_name)
-        to_id = shape_ids.get(parent_table)
-
-        if from_id and to_id:
-            # Default identifying relationships are usually N:1
-            left_card, right_card = "N", "1"
-            add_edge(from_id, diamond_id, left_card)   # weak entity side
-            add_edge(diamond_id, to_id, right_card)   # parent strong entity side
-
-
+            from_id = shape_ids.get(table_name)
+            to_id = shape_ids.get(parent_table)
+            if from_id and to_id:
+                add_edge(from_id, diamond_id, "N")
+                add_edge(diamond_id, to_id, "1")
 
     # Finalize XML
     diagram.append(graph)
     xml_bytes = ET.tostring(mxfile)
     xml_str = minidom.parseString(xml_bytes).toprettyxml(indent="  ")
+
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(xml_str)
-    print(f"Draw.io file saved: {output_file}")
+    print(f"Draw.io file created: {output_file}")
+
 
 
 def analyze_sqlite_schema(sqlite_file):
@@ -402,83 +375,56 @@ def extract_step_sql(text):
     else:
         return ""
 
+import os
+import pandas as pd
+import sqlite3
+from Compare import compare_schemas
+from ERD_to_SQL import process_erd
 
 def process_directory(dirpath, filenames):
+    # Step 1: find schema.sql (or fallback to foldername.sql)
     schema_path = os.path.join(dirpath, "schema.sql")
-    LLM_path = os.path.join(dirpath, "LLM generated SQL.sql")
-    sqlite_path = ""
-    for filename in filenames:
-        if filename.endswith(".sqlite"):
-            sqlite_path = os.path.join(dirpath, filename)
+    if not os.path.exists(schema_path):
+        folder_name = os.path.basename(dirpath)
+        alt_schema = os.path.join(dirpath, f"{folder_name}.sql")
+        if os.path.exists(alt_schema):
+            schema_path = alt_schema
 
-    if not os.path.exists(schema_path) or not os.path.exists(sqlite_path):
-        print(f"Skipping {dirpath}: missing schema.sql or sqlite file")
+    if not os.path.exists(schema_path):
+        print(f"Skipping {dirpath}: no schema.sql or {folder_name}.sql found")
         return None
-    found = False
-    for filename in filenames:
-        if "SQLtoERD" in filename:
-            draw_file = filename
-            found = True
-    if found == False:
-        print(f"Skipping {dirpath}: missing draw.io file file")
-        return None
-    drawio_file = os.path.join(dirpath, draw_file)
-    if not os.path.exists(drawio_file):
-        schema_dict = analyze_sqlite_schema(sqlite_path)
-        create_drawio(schema_dict, drawio_file)
-    else:
-        print(f"Skipping conversion, {drawio_file} already exists.")
-    #schema_dict = analyze_sqlite_schema(sqlite_path)
-    #drawio_file = sqlite_path.replace(".sqlite", "(SQLtoERD).drawio")
-    #create_drawio(schema_dict, drawio_file)
 
-    png_file = os.path.join(dirpath, "diagram.png")
-    convert_drawio_to_png(drawio_file, png_file)
-    print(f"Converted {drawio_file} to {png_file}")
-
-    """if not os.path.exists(png_file):
-        convert_drawio_to_png(drawio_file, png_file)
-        print(f"Converted {drawio_file} to {png_file}")
-    else:
-        print(f"Skipping conversion, {png_file} already exists.")"""
-
-    """if not os.path.exists(LLM_path):
-        uploaded = client.files.upload(file=png_file)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[instruction, uploaded]
-        )
-        llm_response = response.text or ""
-        with open(LLM_path, "w", encoding="utf-8") as f:
-            step5_sql = extract_step_sql(llm_response)
-            f.write(step5_sql)
-    else:
-        print(f"Skipping conversion, {LLM_path} already exists.")
-        with open(LLM_path, "r", encoding="utf-8", errors="ignore") as f:
-            step5_sql = f.read()
-        llm_response = "Using Old Response" """
-
-    uploaded = client.files.upload(file=png_file)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[instruction, uploaded]
-    )
-    llm_response = response.text or ""
-    with open(LLM_path, "w", encoding="utf-8") as f:
-        step5_sql = extract_step_sql(llm_response)
-        f.write(step5_sql)
+    # Step 2: create SQLite database
+    sqlite_path = os.path.join(dirpath, "schema.sqlite")
     with open(schema_path, "r", encoding="utf-8") as f:
         schema_text = f.read()
+    create_sqlite(schema_text, sqlite_path)
+
+    # Step 3: analyze schema → schema_dict
+    schema_dict = analyze_sqlite_schema(sqlite_path)
+    os.remove(sqlite_path)
+
+    # Step 4: generate new drawio from schema_dict
+    drawio_file = os.path.join(dirpath, "schema(SQLtoERD).drawio")
+    create_drawio(schema_dict, drawio_file)
+
+    # Step 5: regenerate SQL from ERD
     control_case_path = os.path.join(dirpath, "ControlCase.sql")
     control_sql = process_erd(drawio_file, control_case_path)
-    diff, equivalent = compare_schemas(schema_text, step5_sql)
-    control_diff, control_equivalent = compare_schemas(schema_text, control_sql)
-    print("equivalent:", equivalent)
-    return {"folder": dirpath, "differences": diff, "equivalent?": equivalent,"control_sql":control_sql, "control differences": control_diff, "control_equivalent?": control_equivalent, "original":schema_text, "full llm response": llm_response}
 
+    # Step 6: compare original SQL vs regenerated SQL
+    control_diff, control_equivalent = compare_schemas(schema_text, control_sql)
+
+    return {
+        "folder": dirpath,
+        "control_sql": control_sql,
+        "control differences": control_diff,
+        "control_equivalent?": control_equivalent,
+        "original": schema_text
+    }
 
 def main(directory):
-    output_file = "results.csv"
+    output_file = "control_results.csv"
 
     if os.path.exists(output_file):
         df = pd.read_csv(output_file)
@@ -492,17 +438,13 @@ def main(directory):
             print(f"Skipping {dirpath}, already processed")
             continue
 
-        try:
-            result = process_directory(dirpath, filenames)
-            if result:
-                df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
-                df.to_csv(output_file, index=False)
-                print(f"Saved results for {dirpath}")
+        result = process_directory(dirpath, filenames)
+        if result:
+            df = pd.concat([df, pd.DataFrame([result])], ignore_index=True)
+            df.to_csv(output_file, index=False)
+            print(f"Saved control results for {dirpath}")
 
-        except Exception as e:
-            print(f"Error processing {dirpath}: {e}")
-            continue
 
 
 if __name__ == "__main__":
-    main("../Spider Dataset(Clean)/Daniel/apartment/rentals")
+    main("../Spider Dataset(Clean)/Daniel")

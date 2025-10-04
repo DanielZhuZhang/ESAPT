@@ -1,11 +1,14 @@
 import xml.etree.ElementTree as ET
 import os
+import random
+import string
+
 
 SHAPE_MAP = {}
 RELATIONSHIPS = {}
 
 #Chen or Crow's Foot or UML
-CURRENT_NOTATION = "UML"
+CURRENT_NOTATION = "Chen(Simple)"
 
 style_hashmap = {
     "Chen(Simple)":{
@@ -265,6 +268,8 @@ def generate_sql():
             (entity1_id, cardinality1), (entity2_id, cardinality2) = entities_connected
             entity1_primary_keys, entity1_all_attr = get_keys(entity1_id)
             entity2_primary_keys, entity2_all_attr = get_keys(entity2_id)
+            entity1_name = SHAPE_MAP[entity1_id]["Name"]
+            entity2_name = SHAPE_MAP[entity2_id]["Name"]
             relation_primary_keys, relation_all_attr = get_keys(relation)
             if SHAPE_MAP[relation]["Weak"]:
                 entity_1_is_weak = SHAPE_MAP[entity1_id]["Weak"]
@@ -307,25 +312,20 @@ def generate_sql():
 
 
                 elif cardinality2 in ["Exactly 1", "Optional: 0 or 1"] and cardinality1 in ["0 or More", "1 or More"]:
-                    (entity1_primary_keys, entity1_all_attr,
-                     entity2_primary_keys, entity2_all_attr) = (
-                        entity2_primary_keys, entity2_all_attr,
-                        entity1_primary_keys, entity1_all_attr
-                    )
-                    if (entity_2_is_weak):
-                        entities[entity2_id]["Attributes"].extend(
-                            make_attribute_tuples(entity1_primary_keys)
-                        )
-                        entities[entity2_id]["ForeignKeys"].append(entity1_id)
-                        entities[entity2_id]["PrimaryKeys"].extend(entity1_primary_keys)
-                        entities[entity2_id]["Comments"].append("Why is the many-side weak????")
-                    else:
+                    if (entity_1_is_weak):
                         entities[entity1_id]["Attributes"].extend(
                             make_attribute_tuples(entity2_primary_keys)
                         )
                         entities[entity1_id]["ForeignKeys"].append(entity2_id)
                         entities[entity1_id]["PrimaryKeys"].extend(entity2_primary_keys)
                         entities[entity2_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
+                    else:
+                        entities[entity2_id]["Attributes"].extend(
+                            make_attribute_tuples(entity1_primary_keys)
+                        )
+                        entities[entity2_id]["ForeignKeys"].append(entity1_id)
+                        entities[entity2_id]["PrimaryKeys"].extend(entity1_primary_keys)
+                        entities[entity2_id]["Comments"].append("Why is the many-side weak????")
 
                 elif cardinality1 in ["0 or More", "1 or More"] and cardinality2 in ["0 or More", "1 or More"]:
                     entities[entity2_id]["Comments"].append("Detected Weak Many–Many: shouldn't exist")
@@ -378,35 +378,40 @@ def generate_sql():
                             entities[entity2_id]["Comments"].append(
                                 f"Added FK to {SHAPE_MAP[entity1_id]['Name']} because {SHAPE_MAP[entity2_id]['Name']} is the many side."
                             )
-                elif (cardinality2 in ["Exactly 1", "Optional: 0 or 1"] and cardinality1 in ["0 or More", "1 or More"]):
-                    entity1_id, entity2_id = entity2_id, entity1_id
-                    cardinality1, cardinality2 = cardinality2, cardinality1
-                    if (len(relation_primary_keys) > 0):
+                elif(cardinality2 in ["Exactly 1", "Optional: 0 or 1"] and cardinality1 in ["0 or More","1 or More"]):
+                    # Case: entity1 is the 'many' side, entity2 is the 'one' side
+                    if len(relation_primary_keys) > 0:
                         entities[relation] = {
                             "Attributes": make_attribute_tuples(relation_all_attr + entity2_primary_keys),
                             "ForeignKeys": [entity2_id],
                             "PrimaryKeys": relation_primary_keys + entity2_primary_keys,
                             "Comments": [
-                                f"Table for one-to-many between {SHAPE_MAP[entity1_id]['Name']} and {SHAPE_MAP[entity2_id]['Name']} due to relations having primary key."]
+                                f"Table for one-to-many between {SHAPE_MAP[entity1_id]['Name']} and {SHAPE_MAP[entity2_id]['Name']} due to relations having primary key."
+                            ]
                         }
                     else:
-                        if (cardinality2 == "0 or More"):
-                            entities[entity2_id]["Attributes"].extend(
-                                make_attribute_tuples(entity2_primary_keys))
-                            entities[entity2_id]["ForeignKeys"].append(entity1_id)
-                            entities[entity2_id]["Comments"].append(
-                                f"Added FK to {SHAPE_MAP[entity1_id]['Name']} because {SHAPE_MAP[entity2_id]['Name']} is the many side."
+                        if cardinality1 in ["0 or More", "1 or More"]:
+                            # entity1 is the 'many' side → add FK to entity1
+                            entities[entity1_id]["Attributes"].extend(
+                                make_attribute_tuples(entity2_primary_keys)
+                            )
+                            entities[entity1_id]["ForeignKeys"].append(entity2_id)
+                            entities[entity1_id]["Comments"].append(
+                                f"Added FK to {SHAPE_MAP[entity2_id]['Name']} because {SHAPE_MAP[entity1_id]['Name']} is the many side."
                             )
                         else:
+                            # Fallback case (should rarely trigger)
                             entities[entity2_id]["Attributes"].extend(
-                                make_attribute_tuples(entity2_primary_keys))
+                                make_attribute_tuples(entity1_primary_keys)
+                            )
                             entities[entity2_id]["ForeignKeys"].append(entity1_id)
                             entities[entity2_id]["Comments"].append(
                                 f"Added FK to {SHAPE_MAP[entity1_id]['Name']} because {SHAPE_MAP[entity2_id]['Name']} is the many side."
                             )
 
+
                 # Many to Many
-                elif (cardinality1 in ["0 or More", "1 or More"]) and (cardinality2 in ["0 or More", "1 or More"]):
+                elif(cardinality1 in ["0 or More", "1 or More"]) and (cardinality2 in ["0 or More", "1 or More"]):
                     entities[relation] = {
                         "Attributes": relation_all_attr + entity1_primary_keys + entity2_primary_keys,
                         "ForeignKeys": [entity2_id, entity1_id],
@@ -419,26 +424,37 @@ def generate_sql():
     for entity_id, relation_data in entities.items():
         entity_primary_keys, entity_all_keys = get_keys(entity_id)
         entity_name = SHAPE_MAP[entity_id]["Name"]
-        pk_cols = list(set(entity_primary_keys + relation_data["PrimaryKeys"]))
         cols = []
         constraints = []
 
-        for attr_entry in relation_data["Attributes"]:
-            if isinstance(attr_entry, tuple):
-                attr_name, attr_constraints = attr_entry
-                constraint_str = " ".join(attr_constraints) if attr_constraints else ""
-                cols.append(f"{attr_name} VARCHAR(255) {constraint_str}".strip())
-            else:
-                cols.append(f"{attr_entry} VARCHAR(255)")
+        # keep track of renamed FK columns for later PK adjustment
+        fk_rename_map = {}
 
+        # add entity attributes
         for attr in entity_all_keys:
             cols.append(f"{attr} VARCHAR(255)")
 
+        # process foreign keys
         for fk_id in relation_data["ForeignKeys"]:
             fk_primary_keys, fk_all_keys = get_keys(fk_id)
             fk_name = SHAPE_MAP[fk_id]["Name"]
+
             for key in fk_primary_keys:
-                constraints.append(f"FOREIGN KEY ({key}) REFERENCES {fk_name}({key})")
+                rand_prefix = random.choice(string.ascii_lowercase) + ''.join(
+                    random.choices(string.ascii_lowercase + string.digits, k=3))
+                new_key = f"{rand_prefix}_{key}"
+
+                # store mapping so we can fix PKs later
+                fk_rename_map[key] = new_key
+
+                cols.append(f"{new_key} VARCHAR(255)")
+                constraints.append(f"FOREIGN KEY ({new_key}) REFERENCES {fk_name}({key})")
+
+        # update primary key columns (replace old FK names if necessary)
+        entity_primary_keys = [
+            fk_rename_map.get(pk, pk) for pk in entity_primary_keys
+        ]
+        pk_cols = list(set(entity_primary_keys + relation_data["PrimaryKeys"]))
 
         if pk_cols:
             constraints.insert(0, f"PRIMARY KEY ({', '.join(pk_cols)})")
@@ -453,35 +469,30 @@ def generate_sql():
 
     return "\n\n".join(sql)
 
+def process_erd(file_path, output_path):
+    SHAPE_MAP.clear()
+    RELATIONSHIPS.clear()
+    tree = ET.parse(file_path)
+    xml_root = tree.getroot()
 
+    update_shape_map(xml_root)
+
+    base_name = os.path.splitext(file_path)[0]
+    sql = generate_sql()
+    with open(output_path, "w") as sql_file:
+        sql_file.write(sql)
+    return sql
 
 if __name__ == '__main__':
-    """input_file = "../ERDtoSQL Test/UMLTestsCardinality/uml_permutations/0_1(weak)_to_Many/0_1(weak)_to_Many.drawio"
-    if os.path.exists(input_file):
-        tree = ET.parse(input_file)
-        root = tree.getroot()
 
-        update_shape_map(root)
-        print(generate_sql())
-    else:
-        print(f"File {input_file} not found")"""
 
-    directory = "../ERDtoSQL Test/UMLTestsCardinality"
+    directory = "../Spider Dataset(Clean)/Daniel/apartment_rentals"
 
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.endswith(".drawio"):
                 file_path = os.path.join(root, file)
+                output_path = os.path.join(root, file.replace("(Back to SQL).drawio", ".sql"))
                 SHAPE_MAP.clear()
                 RELATIONSHIPS.clear()
-                tree = ET.parse(file_path)
-                xml_root = tree.getroot()
-
-                update_shape_map(xml_root)
-
-                base_name = os.path.splitext(file)[0]
-                output_path = os.path.join(root, base_name + ".sql")
-
-                with open(output_path, "w") as sql_file:
-                    print(f"+++++++++++++++++++++++++++++++++++++writing to {output_path}+++++++++++++++++++++++++++++++++++++++++++++++++++")
-                    sql_file.write(generate_sql())
+                process_erd(file_path, output_path)
