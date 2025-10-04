@@ -4,10 +4,6 @@ from sqlglot.expressions import (
 )
 import os
 from sqlglot import parse, exp
-
-
-import re
-
 import re
 
 def clean_sql(sql: str) -> str:
@@ -95,91 +91,80 @@ def compare_attributes(expr1, expr2):
     return results, equivalent
 
 
-
-
 def primary_key_checker(expr1, expr2):
-    def extract_pks_with_refs(expr):
-        pk_columns = []
-        pk_references = []
+    pk1 = []
+    pk2 = []
 
-        for col in expr.this.expressions:
-            # Check for column-level constraints
-            if col.args.get("constraints"):
-                for cons in col.args["constraints"]:
-                    if isinstance(cons.kind, PrimaryKeyColumnConstraint):
-                        pk_columns.append(col.name)
+    # Extract foreign keys and referenced tables
+    table1referenced, table1fk_columns = extract_fk_tables(expr1)
+    table2referenced, table2fk_columns = extract_fk_tables(expr2)
 
-                        # Check if this PK column also has a foreign key reference
-                        if col.args.get("references"):
-                            ref = col.args["references"]
-                            ref_table = getattr(ref.this, "this", None)
-                            ref_column = (
-                                ref.expressions[0].this if ref.expressions else None
-                            )
-                            pk_references.append(
-                                (col.name, ref_table, ref_column)
-                            )
+    # Extract PKs for schema 1
+    for col in expr1.this.expressions:
+        if col.args.get("constraints"):
+            for cons in col.args["constraints"]:
+                if isinstance(cons.kind, PrimaryKeyColumnConstraint):
+                    pk1.append(col.name)
+    for expr in expr1.this.expressions:
+        if isinstance(expr, PrimaryKey):
+            for pk in expr.expressions:
+                pk1.append(pk.this)
 
-        # Also check for table-level primary keys
-        for expr_item in expr.this.expressions:
-            if isinstance(expr_item, PrimaryKey):
-                for pk in expr_item.expressions:
-                    pk_columns.append(pk.this)
-                    # Some table-level PKs may have reference info too
-                    if pk.args.get("references"):
-                        ref = pk.args["references"]
-                        ref_table = getattr(ref.this, "this", None)
-                        ref_column = (
-                            ref.expressions[0].this if ref.expressions else None
-                        )
-                        pk_references.append((pk.this, ref_table, ref_column))
+    # Extract PKs for schema 2
+    for col in expr2.this.expressions:
+        if col.args.get("constraints"):
+            for cons in col.args["constraints"]:
+                if isinstance(cons.kind, PrimaryKeyColumnConstraint):
+                    pk2.append(col.name)
+    for expr in expr2.this.expressions:
+        if isinstance(expr, PrimaryKey):
+            for pk in expr.expressions:
+                pk2.append(pk.this)
 
-        return pk_columns, pk_references
+    # Convert to sets for comparison
+    pk1_set = set(pk1)
+    pk2_set = set(pk2)
+    fk1_set = set(table1fk_columns)
+    fk2_set = set(table2fk_columns)
+    ref1_set = set(table1referenced)
+    ref2_set = set(table2referenced)
 
-    # Extract for both schemas
-    pk1_cols, pk1_refs = extract_pks_with_refs(expr1)
-    pk2_cols, pk2_refs = extract_pks_with_refs(expr2)
+    # Compare primary keys excluding FK columns
+    pk_comparison = (pk1_set - fk1_set) == (pk2_set - fk2_set)
 
-    results = []
-    equivalent = True
+    # Compare referenced tables directly
+    ref_comparison = ref1_set == ref2_set
 
-    # Compare plain PK columns
-    if set(pk1_cols) == set(pk2_cols):
-        results.append("Primary key columns are the same.")
+    if pk_comparison and ref_comparison:
+        return ["Primary keys and references are the same"], True
     else:
-        results.append(
-            f"Primary key column mismatch:\n  schema1: {pk1_cols}\n  schema2: {pk2_cols}"
-        )
-        equivalent = False
+        msg = f"Primary key or reference mismatch:\n  schema1 PKs: {pk1}\n  schema2 PKs: {pk2}\n  schema1 refs: {table1referenced}\n  schema2 refs: {table2referenced}"
+        return [msg], False
 
-    # Compare PKs that are also FKs (referential primary keys)
-    if set(pk1_refs) == set(pk2_refs):
-        results.append("Referential primary keys (PK+FK) are equivalent.")
-    else:
-        results.append(
-            f"Referential primary key mismatch:\n  schema1: {pk1_refs}\n  schema2: {pk2_refs}"
-        )
-        equivalent = False
 
-    return results, equivalent
+def extract_fk_tables(expr):
+    referenced = []
+    fk_columns = []
 
+    for e in expr.this.expressions:
+        if isinstance(e, Constraint):
+            for constraint in e.expressions:
+                if isinstance(constraint, ForeignKey):
+                    ref = constraint.args.get("reference")
+                    if ref:
+                        referenced.append(ref.this.this.this.this)
+                    if constraint.name:
+                        fk_columns.append(str(constraint.name))
+        elif isinstance(e, ForeignKey):
+            ref = e.args.get("reference")
+            if ref:
+                referenced.append(ref.this.this.this.this)
+            if e.name:
+                fk_columns.append(str(e.name))
+
+    return referenced, fk_columns
 
 def foreign_key_checker(expr1, expr2):
-    def extract_fk_tables(expr):
-        referenced = []
-        for e in expr.this.expressions:
-            if isinstance(e, Constraint):
-                for constraint in e.expressions:
-                    if isinstance(constraint, ForeignKey):
-                        ref = constraint.args.get("reference")
-                        if ref:
-                            referenced.append(ref.this.this.this.this)
-            elif isinstance(e, ForeignKey):
-                ref = e.args.get("reference")
-                if ref:
-                    referenced.append(ref.this.this.this.this)
-        return referenced
-
     fk1_tables = set(extract_fk_tables(expr1))
     fk2_tables = set(extract_fk_tables(expr2))
 
