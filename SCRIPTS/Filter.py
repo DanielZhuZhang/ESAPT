@@ -1,11 +1,12 @@
 import os
 import sqlite3
 import pandas as pd
-
+import shutil
 def delete_if_exists(file_path):
     if os.path.exists(file_path):
         os.remove(file_path)
         print("Deleted file")
+
 
 def extract_schema(db_path):
     conn = sqlite3.connect(db_path)
@@ -106,17 +107,17 @@ def process_all_sqlite_files(directory):
 
                 schema_df, fk_df, tables_without_pk, tables_without_rel = extract_schema(file_path)
 
-                # Count total tables in this DB
                 db_table_names = schema_df['table_name'].unique()
                 total_tables_scanned += len(db_table_names)
 
-                # Count unique anomalous tables in this DB
                 anomalous_tables = set(tables_without_pk).union(tables_without_rel)
                 num_anomalous = len(anomalous_tables)
                 total_anomalous_tables += num_anomalous
 
                 if num_anomalous > 0:
                     total_files_with_anomalies += 1
+                    shutil.rmtree(foldername)
+                    print(f"{num_anomalous} anomalies found in {file_path}")
 
                 write_anomalies_report(foldername, tables_without_pk, tables_without_rel, filename)
 
@@ -126,6 +127,16 @@ def process_all_sqlite_files(directory):
     print(f"Total tables with anomalies           : {total_anomalous_tables}")
     print(f"Total .sqlite files with anomalies    : {total_files_with_anomalies}")
 
+def delete_anomaly_folders(directory):
+    total_files = 0
+    total_tables_scanned = 0
+    total_anomalous_tables = 0
+    total_files_with_anomalies = 0
+
+    for foldername, subfolders, filenames in os.walk(directory):
+        for filename in filenames:
+            if "anomalies" in filename:
+                shutil.rmtree(foldername)
 
 
 
@@ -144,5 +155,5 @@ if __name__ == '__main__':
     # print("\n=== Tables without Primary Key ===")
     # print(tables_without_primary_key)
     #
-    root_dir = "Spider Dataset2"
-    process_all_sqlite_files(root_dir)
+    root_dir = "../Spider Dataset(Clean)"
+    delete_anomaly_folders(root_dir)

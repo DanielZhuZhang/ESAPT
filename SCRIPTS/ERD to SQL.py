@@ -328,16 +328,9 @@ def generate_sql():
                         entities[entity2_id]["Comments"].append("Weak 1–Many: PK = owner PK + partial key")
 
                 elif cardinality1 in ["0 or More", "1 or More"] and cardinality2 in ["0 or More", "1 or More"]:
-                    entities[relation] = {
-                        "Attributes": make_attribute_tuples(
-                            relation_all_attr + entity1_primary_keys + entity2_primary_keys),
-                        "ForeignKeys": [entity1_id, entity2_id],
-                        "PrimaryKeys": relation_primary_keys + entity1_primary_keys + entity2_primary_keys,
-                        "Comments": ["Weak Many-to-Many(this is werid): join table inherits both owner keys"]
-                    }
-                    print('Why is your weak relation Many to Many')
+                    entities[entity2_id]["Comments"].append("Detected Weak Many–Many: shouldn't exist")
                 else:
-                    print('NOTHING WORKING>FPOaocmoanc')
+                    pass
             else:
             # One to One
                 if cardinality1 in ["Exactly 1", "Optional: 0 or 1"] and cardinality2 in ["Exactly 1", "Optional: 0 or 1"]:
@@ -346,19 +339,19 @@ def generate_sql():
                         entities[entity1_id]["Attributes"].extend(
                             make_attribute_tuples(entity2_primary_keys, ["UNIQUE"])
                         )
-                        entities[entity1_id]["Comments"].append("Optional 1–1: FK in entity1")
+                        entities[entity1_id]["Comments"].append("Optional 1–1: FK in Optional Side")
                     elif cardinality2.startswith("Optional"):
                         entities[entity2_id]["ForeignKeys"].append(entity1_id)
                         entities[entity2_id]["Attributes"].extend(
                             make_attribute_tuples(entity1_primary_keys, ["UNIQUE"])
                         )
-                        entities[entity2_id]["Comments"].append("Optional 1–1: FK in entity2")
+                        entities[entity2_id]["Comments"].append("Optional 1–1: FK in Optional Side")
                     else:
                         entities[entity2_id]["ForeignKeys"].append(entity1_id)
                         entities[entity2_id]["Attributes"].extend(
                             make_attribute_tuples(entity1_primary_keys, ["UNIQUE", "NOT NULL"])
                         )
-                        entities[entity2_id]["Comments"].append("Exact 1–1: enforced with UNIQUE + NOT NULL")
+                        entities[entity2_id]["Comments"].append("Exact 1–1: enforced with UNIQUE + NOT NULL, FK can be either side")
 
                 # One to Many
                 elif (cardinality1 in ["Exactly 1", "Optional: 0 or 1"] and cardinality2 in ["0 or More", "1 or More"]):
